@@ -138,12 +138,12 @@ with right_col:
     except Exception as e:
         st.error(f"Failed to read stats: {e}")
 
-    if st.button("Save conversation to file"):
+    if st.button("Save conversation to file", key="save_conv_btn"):
         fname = f"conversation_{int(time.time())}.json"
         with open(fname, "w", encoding="utf-8") as f:
             json.dump(st.session_state.history, f, ensure_ascii=False, indent=2)
         st.success(f"Saved conversation to {fname}")
-    if st.button("Save conversation to file"):
+    if st.button("Save conversation to file", key="save_conv_btn"):
         fname = f"conversation_{int(time.time())}.json"
         with open(fname, "w", encoding="utf-8") as f:
             json.dump(st.session_state.history, f, ensure_ascii=False, indent=2)
