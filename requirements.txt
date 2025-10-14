@@ -1,10 +1,7 @@
 streamlit==1.39.0
-langchain==0.2.16
-chromadb==0.5.5
-sentence-transformers==2.2.2
-pypdf==4.2.0
-faiss-cpu==1.8.0
-transformers==4.37.2
-torch==2.1.0
+langchain
+chromadb
+sentence-transformers
+pypdf
 tqdm
 requests
