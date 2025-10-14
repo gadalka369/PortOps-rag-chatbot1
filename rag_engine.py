@@ -189,4 +189,4 @@ Answer:"""
         except Exception as e:
             logger.error(f"Stats error: {e}")
             return {"documents": 0, "vectors": 0, "last_index_time": "N/A", "retriever_type": "chroma_retriever"}
-\n
+          
