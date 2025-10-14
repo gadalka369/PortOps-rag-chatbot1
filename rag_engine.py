@@ -18,6 +18,14 @@ class DocumentMetadata:
     source: str
     page: Optional[int] = None
 
+# Initialize RAG engine
+rag_engine = RAGEngine(
+    persist_directory="chroma_persist",
+    embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+    hf_model="google/flan-t5-small",
+    use_openai=False  # Set True if you have an OpenAI API key
+)
+
 # --- RAG Engine ---
 class RAGEngine:
     def __init__(
