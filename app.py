@@ -143,4 +143,8 @@ with right_col:
         with open(fname, "w", encoding="utf-8") as f:
             json.dump(st.session_state.history, f, ensure_ascii=False, indent=2)
         st.success(f"Saved conversation to {fname}")
-\n
+    if st.button("Save conversation to file"):
+        fname = f"conversation_{int(time.time())}.json"
+        with open(fname, "w", encoding="utf-8") as f:
+            json.dump(st.session_state.history, f, ensure_ascii=False, indent=2)
+        st.success(f"Saved conversation to {fname}")
