@@ -1,0 +1,9 @@
+
+.venv/
+__pycache__/
+chroma_persist/
+uploads/
+.env
+*.pyc
+.DS_Store
+\n

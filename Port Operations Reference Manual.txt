@@ -1,0 +1,49 @@
+
+Port Operations Reference Manual
+--------------------------------
+Version: 1.0
+Date: 2025-01-01
+
+SECTION 1: Crane Safety Procedures
+1.1 General
+- All crane operators must be certified according to port regulations.
+- Daily pre-operation checks must be performed. Check cables, hydraulic lines, emergency brakes, and limit switches.
+- Operators must wear high visibility clothing, safety helmets, and harnesses when required.
+
+1.2 Lifting & Load Handling
+- Verify container weight against manifest before lift.
+- Use proper lift slings and spreader bars; do not exceed SWL (Safe Working Load).
+- Never lift over personnel; ensure exclusion zones are established and respected.
+
+1.3 Emergency Procedures
+- In case of a cable failure or dropped load, sound the alarm and isolate the area.
+- Report incidents immediately to the Port Control Center (see Emergency Contacts section).
+
+SECTION 2: Vessel Berthing Requirements
+2.1 Pre-berthing checks
+- Master must confirm pilot and tug availability, berth depth, tidal windows, and mooring plan.
+- Required documents: berthing request, cargo manifest, and safety certificates.
+
+2.2 Mooring
+- Minimum of 6 mooring lines for container vessels >200m; adjust based on wind and tidal conditions.
+- Fenders must be checked and placed per berth specification.
+
+SECTION 3: Cargo Handling Procedures
+3.1 Container operations
+- Ensure containers with hazardous labels have placarding visible and documentation available.
+- Stowage should follow IMDG code for dangerous goods.
+
+SECTION 4: Environmental Regulations
+4.1 Waste handling
+- No discharge of oily bilge water within port limits. Use designated reception facilities.
+- Solid waste should be segregated and disposed as per port waste plan.
+
+SECTION 5: Emergency Contacts
+- Port Control Center: +971-XXX-XXXX (24/7)
+- Terminal Operations Manager: +971-XXX-YYYY
+- Emergency Response Unit: +971-XXX-ZZZZ
+
+SECTION 6: Weather Restrictions
+6.1 Wind limits
+- Container lifting suspended when sustained wind >40 knots or gusts >50 knots for exposed operations.
+\n
