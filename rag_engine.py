@@ -18,14 +18,6 @@ class DocumentMetadata:
     source: str
     page: Optional[int] = None
 
-# Initialize RAG engine
-rag_engine = RAGEngine(
-    persist_directory="chroma_persist",
-    embedding_model="sentence-transformers/all-MiniLM-L6-v2",
-    hf_model="google/flan-t5-small",
-    use_openai=False  # Set True if you have an OpenAI API key
-)
-
 # --- RAG Engine ---
 class RAGEngine:
     def __init__(
@@ -148,4 +140,3 @@ class RAGEngine:
         except Exception as e:
             print(f"Stats error: {e}")
             return {"documents": 0, "vectors": 0, "last_index_time": "N/A", "retriever_type": "chroma_retriever"}
-
