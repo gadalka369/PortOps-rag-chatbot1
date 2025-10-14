@@ -1,4 +1,3 @@
-
 """app.py
 
 Streamlit web app — Streamlit Cloud ready.
@@ -12,7 +11,6 @@ import json
 from pathlib import Path
 
 import streamlit as st
-
 from rag_engine import RAGEngine
 
 # --- Constants
@@ -23,10 +21,19 @@ DEFAULT_DOC = "Port Operations Reference Manual.txt"
 
 st.set_page_config(page_title="PortOps RAG Chatbot (Demo)", layout="wide", initial_sidebar_state="expanded")
 
+# --- Initialize RAG Engine ---
+rag_engine = RAGEngine(
+    persist_directory=CHROMA_DIR,
+    embedding_model="sentence-transformers/all-MiniLM-L6-v2",
+    hf_model="google/flan-t5-small",
+    use_openai=False  # Set True if you have OpenAI API key
+)
+
 # Header
 st.markdown("""<div style='padding:12px;border-radius:8px;background:linear-gradient(90deg,#0b5cff,#00b7ff);color:white'>
 <h2>PortOps RAG Chatbot — Demo (Ready to chat)</h2></div>""", unsafe_allow_html=True)
 st.markdown("Upload new documents or use the built-in reference manual to try the chatbot immediately.")
+
 # --- Sidebar / Upload Section ---
 st.sidebar.header("Document Upload")
 uploaded_file = st.sidebar.file_uploader(
@@ -35,12 +42,15 @@ uploaded_file = st.sidebar.file_uploader(
 
 if uploaded_file is not None:
     try:
-        # Save the uploaded file temporarily
-        with open(f"uploaded_{uploaded_file.name}", "wb") as f:
+        # Save uploaded file
+        upload_path = UPLOADS_DIR / uploaded_file.name
+        with open(upload_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.sidebar.success(f"Uploaded {uploaded_file.name}")
-        # Here you would index the new document into RAG
-        # rag_engine.index_new_document(f"uploaded_{uploaded_file.name}")
+
+        # Index new document into RAG
+        rag_engine.index_documents([str(upload_path)])
+
     except Exception as e:
         st.sidebar.error(f"Failed to upload document: {e}")
 
