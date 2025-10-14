@@ -124,14 +124,15 @@ class RAGEngine:
             )
         
         try:
-            # Initialize HuggingFace Hub with explicit token parameter
+            # Initialize HuggingFace Hub with explicit token and task parameters
             llm = HuggingFaceHub(
                 repo_id=self.hf_model,
+                task="text2text-generation",  # Required for Flan-T5 models
                 model_kwargs={
                     "temperature": 0.3,
                     "max_length": 512,
                 },
-                huggingfacehub_api_token=self.hf_token  # Explicit token parameter
+                huggingfacehub_api_token=self.hf_token
             )
             print(f"✅ Initialized Hugging Face model: {self.hf_model}")
             return llm
