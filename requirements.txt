@@ -1,10 +1,13 @@
+# Core dependencies with specific versions that work together
 streamlit==1.39.0
-langchain==0.1.0
+langchain==0.1.20
 langchain-community==0.0.38
 chromadb==0.4.24
-sentence-transformers==2.7.0
-pypdf==4.3.1
-tqdm==4.66.5
-requests==2.32.3
-huggingface-hub==0.24.0
-pydantic==2.7.4
+sentence-transformers==2.5.1
+pypdf==3.17.4
+requests==2.31.0
+tqdm==4.66.2
+
+# Fix for Streamlit Cloud compatibility
+pydantic==2.6.4
+typing-extensions==4.10.0
