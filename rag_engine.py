@@ -1,6 +1,7 @@
-"""rag_engine.py - FINAL FIXED VERSION
+"""rag_engine.py - COMPLETE WORKING VERSION
 
-This version properly handles HuggingFace token for Streamlit Cloud deployment.
+This version uses HuggingFaceEndpoint instead of deprecated HuggingFaceHub.
+Works with latest LangChain versions on Streamlit Cloud.
 """
 
 import os
@@ -8,20 +9,20 @@ import time
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-# Updated LangChain imports (compatible with latest versions)
+# Updated LangChain imports
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain.chains import RetrievalQA
-from langchain_community.llms import HuggingFaceHub
+from langchain_community.llms import HuggingFaceEndpoint  # Use Endpoint instead of Hub
 from langchain.prompts import PromptTemplate
 
 
 class RAGEngine:
     """
     Retrieval-Augmented Generation Engine for document Q&A
-    Handles both HUGGINGFACEHUB_API_TOKEN and HUGGINGFACE_API_TOKEN
+    Uses HuggingFaceEndpoint for compatibility with latest API
     """
     
     def __init__(
@@ -41,8 +42,8 @@ class RAGEngine:
             embedding_model: Sentence transformer model for embeddings
             hf_model: Hugging Face model for generation
             hf_token: Hugging Face API token (optional, will check env vars)
-            use_openai: Whether to use OpenAI (not implemented in this version)
-            openai_api_key: OpenAI API key (not used in this version)
+            use_openai: Whether to use OpenAI (not implemented)
+            openai_api_key: OpenAI API key (not used)
         """
         self.persist_directory = persist_directory
         self.embedding_model = embedding_model
@@ -54,7 +55,6 @@ class RAGEngine:
         if hf_token:
             self.hf_token = hf_token
         else:
-            # Try different environment variable names
             self.hf_token = (
                 os.environ.get("HUGGINGFACEHUB_API_TOKEN") or 
                 os.environ.get("HUGGINGFACE_API_TOKEN") or
@@ -114,7 +114,7 @@ class RAGEngine:
     
     def _init_llm(self):
         """
-        Initialize the Language Model (Hugging Face).
+        Initialize the Language Model using HuggingFaceEndpoint.
         """
         if not self.hf_token:
             raise ValueError(
@@ -124,14 +124,11 @@ class RAGEngine:
             )
         
         try:
-            # Initialize HuggingFace Hub with explicit token and task parameters
-            llm = HuggingFaceHub(
+            # Use HuggingFaceEndpoint (newer, working API)
+            llm = HuggingFaceEndpoint(
                 repo_id=self.hf_model,
-                task="text2text-generation",  # Required for Flan-T5 models
-                model_kwargs={
-                    "temperature": 0.3,
-                    "max_length": 512,
-                },
+                temperature=0.3,
+                max_new_tokens=250,
                 huggingfacehub_api_token=self.hf_token
             )
             print(f"✅ Initialized Hugging Face model: {self.hf_model}")
@@ -264,6 +261,9 @@ Answer (be specific and cite information from the context):"""
             
             # Extract answer
             answer = result.get("result", "")
+            
+            # Clean up answer (remove extra whitespace, newlines)
+            answer = " ".join(answer.split())
             
             # Extract sources
             source_docs = result.get("source_documents", [])
