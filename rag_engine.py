@@ -1,28 +1,26 @@
-"""rag_engine.py - COMPLETE WORKING VERSION
+"""rag_engine.py - SIMPLIFIED WORKING VERSION
 
-This version uses HuggingFaceEndpoint instead of deprecated HuggingFaceHub.
-Works with latest LangChain versions on Streamlit Cloud.
+Uses direct Hugging Face Inference API instead of LangChain's wrapper.
+This avoids the InferenceClient compatibility issues.
 """
 
 import os
 import time
+import requests
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-# Updated LangChain imports
+# LangChain imports
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
-from langchain.chains import RetrievalQA
-from langchain_community.llms import HuggingFaceEndpoint  # Use Endpoint instead of Hub
-from langchain.prompts import PromptTemplate
 
 
 class RAGEngine:
     """
     Retrieval-Augmented Generation Engine for document Q&A
-    Uses HuggingFaceEndpoint for compatibility with latest API
+    Uses direct HuggingFace API calls to avoid compatibility issues
     """
     
     def __init__(
@@ -34,24 +32,14 @@ class RAGEngine:
         use_openai: bool = False,
         openai_api_key: Optional[str] = None,
     ):
-        """
-        Initialize the RAG engine.
-        
-        Args:
-            persist_directory: Directory for ChromaDB persistence
-            embedding_model: Sentence transformer model for embeddings
-            hf_model: Hugging Face model for generation
-            hf_token: Hugging Face API token (optional, will check env vars)
-            use_openai: Whether to use OpenAI (not implemented)
-            openai_api_key: OpenAI API key (not used)
-        """
+        """Initialize the RAG engine."""
         self.persist_directory = persist_directory
         self.embedding_model = embedding_model
         self.hf_model = hf_model
         self.use_openai = use_openai
         self.openai_api_key = openai_api_key
         
-        # Get HF token - check multiple possible env var names
+        # Get HF token
         if hf_token:
             self.hf_token = hf_token
         else:
@@ -61,7 +49,13 @@ class RAGEngine:
                 None
             )
         
-        # Create persist directory if it doesn't exist
+        if not self.hf_token:
+            raise ValueError(
+                "Hugging Face API token is required. "
+                "Get a free token at: https://huggingface.co/settings/tokens"
+            )
+        
+        # Create persist directory
         os.makedirs(self.persist_directory, exist_ok=True)
         
         # Initialize embeddings
@@ -72,109 +66,102 @@ class RAGEngine:
             encode_kwargs={'normalize_embeddings': True}
         )
         
-        # Initialize or load vectorstore
+        # Initialize vectorstore
         print("🔧 Initializing vector store...")
         self.vectorstore = self._init_vectorstore()
         
         # Initialize retriever
-        self.retriever = self.vectorstore.as_retriever(
-            search_kwargs={"k": 3}  # Retrieve top 3 most relevant chunks
-        )
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
         
-        # Initialize LLM
-        print("🔧 Initializing LLM...")
-        self.llm = self._init_llm()
-        
-        # Build QA chain with custom prompt
-        print("🔧 Building QA chain...")
-        self.qa_chain = self._build_qa_chain()
+        # Set up HuggingFace API endpoint
+        self.api_url = f"https://api-inference.huggingface.co/models/{self.hf_model}"
+        self.headers = {"Authorization": f"Bearer {self.hf_token}"}
         
         print("✅ RAG Engine initialized successfully!")
     
     def _init_vectorstore(self) -> Chroma:
-        """
-        Initialize or load Chroma vectorstore with persistence.
-        """
+        """Initialize or load Chroma vectorstore."""
         try:
-            # Try to load existing vectorstore
             vectorstore = Chroma(
                 persist_directory=self.persist_directory,
                 embedding_function=self.embeddings
             )
-            print(f"✅ Loaded existing vectorstore from {self.persist_directory}")
+            print(f"✅ Loaded vectorstore from {self.persist_directory}")
             return vectorstore
         except Exception as e:
-            print(f"⚠️ Creating new vectorstore (error loading existing: {e})")
-            # Create new empty vectorstore
+            print(f"⚠️ Creating new vectorstore: {e}")
             vectorstore = Chroma(
                 persist_directory=self.persist_directory,
                 embedding_function=self.embeddings
             )
             return vectorstore
     
-    def _init_llm(self):
+    def _query_huggingface(self, prompt: str, max_retries: int = 3) -> str:
         """
-        Initialize the Language Model using HuggingFaceEndpoint.
+        Query HuggingFace API directly with retry logic.
         """
-        if not self.hf_token:
-            raise ValueError(
-                "Hugging Face API token is required. "
-                "Please add HUGGINGFACEHUB_API_TOKEN to your Streamlit secrets.\n"
-                "Get a free token at: https://huggingface.co/settings/tokens"
-            )
+        payload = {
+            "inputs": prompt,
+            "parameters": {
+                "max_new_tokens": 250,
+                "temperature": 0.3,
+                "return_full_text": False
+            }
+        }
         
-        try:
-            # Use HuggingFaceEndpoint (newer, working API)
-            llm = HuggingFaceEndpoint(
-                repo_id=self.hf_model,
-                temperature=0.3,
-                max_new_tokens=250,
-                huggingfacehub_api_token=self.hf_token
-            )
-            print(f"✅ Initialized Hugging Face model: {self.hf_model}")
-            return llm
-        except Exception as e:
-            raise Exception(f"Failed to initialize LLM: {str(e)}")
-    
-    def _build_qa_chain(self):
-        """
-        Build the Question-Answering chain with custom prompt.
-        """
-        # Custom prompt for port operations
-        prompt_template = """You are an AI assistant for port operations. Use the following context to answer the question accurately and concisely.
-
-Context:
-{context}
-
-Question: {question}
-
-Answer (be specific and cite information from the context):"""
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(
+                    self.api_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30
+                )
+                
+                if response.status_code == 200:
+                    result = response.json()
+                    
+                    # Handle different response formats
+                    if isinstance(result, list) and len(result) > 0:
+                        if isinstance(result[0], dict) and 'generated_text' in result[0]:
+                            return result[0]['generated_text'].strip()
+                        elif isinstance(result[0], str):
+                            return result[0].strip()
+                    elif isinstance(result, dict) and 'generated_text' in result:
+                        return result['generated_text'].strip()
+                    
+                    return str(result).strip()
+                
+                elif response.status_code == 503:
+                    # Model is loading, wait and retry
+                    wait_time = 5 * (attempt + 1)
+                    print(f"⏳ Model loading... waiting {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                
+                else:
+                    error_msg = f"API Error {response.status_code}: {response.text}"
+                    if attempt == max_retries - 1:
+                        raise Exception(error_msg)
+                    print(f"⚠️ {error_msg}, retrying...")
+                    time.sleep(2)
+                    
+            except requests.exceptions.Timeout:
+                if attempt == max_retries - 1:
+                    raise Exception("Request timed out after 30 seconds")
+                print(f"⏳ Timeout, retrying... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(2)
+                
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise Exception(f"HuggingFace API error: {str(e)}")
+                print(f"⚠️ Error: {e}, retrying...")
+                time.sleep(2)
         
-        PROMPT = PromptTemplate(
-            template=prompt_template,
-            input_variables=["context", "question"]
-        )
-        
-        qa_chain = RetrievalQA.from_chain_type(
-            llm=self.llm,
-            chain_type="stuff",
-            retriever=self.retriever,
-            return_source_documents=True,
-            chain_type_kwargs={"prompt": PROMPT}
-        )
-        
-        return qa_chain
+        raise Exception("Failed to get response after all retries")
     
     def load_documents(self, file_paths: List[str]) -> List[Any]:
-        """
-        Load documents from file paths (PDF or TXT).
-        
-        Args:
-            file_paths: List of file paths to load
-            
-        Returns:
-            List of loaded documents
-        """
+        """Load documents from file paths."""
         all_docs = []
         
         for path in file_paths:
@@ -186,12 +173,12 @@ Answer (be specific and cite information from the context):"""
                 elif ext == ".txt":
                     loader = TextLoader(path, encoding='utf-8')
                 else:
-                    print(f"⚠️ Skipping unsupported file type: {path}")
+                    print(f"⚠️ Skipping unsupported file: {path}")
                     continue
                 
                 docs = loader.load()
                 all_docs.extend(docs)
-                print(f"✅ Loaded: {Path(path).name} ({len(docs)} pages/sections)")
+                print(f"✅ Loaded: {Path(path).name} ({len(docs)} pages)")
                 
             except Exception as e:
                 print(f"❌ Error loading {path}: {str(e)}")
@@ -200,19 +187,14 @@ Answer (be specific and cite information from the context):"""
         return all_docs
     
     def index_documents(self, file_paths: List[str]):
-        """
-        Index documents into the vector store.
-        
-        Args:
-            file_paths: List of file paths to index
-        """
+        """Index documents into the vector store."""
         print(f"📄 Loading {len(file_paths)} document(s)...")
         docs = self.load_documents(file_paths)
         
         if not docs:
             raise ValueError("No documents loaded successfully")
         
-        # Split documents into chunks
+        # Split documents
         print("✂️ Splitting documents into chunks...")
         splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
@@ -221,14 +203,12 @@ Answer (be specific and cite information from the context):"""
             separators=["\n\n", "\n", " ", ""]
         )
         chunks = splitter.split_documents(docs)
-        
         print(f"📦 Created {len(chunks)} chunks")
         
         # Add metadata
         for i, chunk in enumerate(chunks):
             if not hasattr(chunk, 'metadata'):
                 chunk.metadata = {}
-            # Ensure source is tracked
             if 'source' not in chunk.metadata:
                 chunk.metadata['source'] = f"document_{i}"
         
@@ -236,7 +216,6 @@ Answer (be specific and cite information from the context):"""
         print("💾 Adding to vector store...")
         self.vectorstore.add_documents(chunks)
         
-        # Persist changes
         try:
             self.vectorstore.persist()
             print("✅ Vector store updated and persisted")
@@ -246,30 +225,36 @@ Answer (be specific and cite information from the context):"""
     def ask(self, query: str) -> tuple[str, List[str]]:
         """
         Ask a question and get an answer with sources.
-        
-        Args:
-            query: The question to ask
-            
-        Returns:
-            Tuple of (answer, list of source documents)
         """
         try:
             print(f"🔍 Processing query: {query}")
             
-            # Get answer from QA chain
-            result = self.qa_chain.invoke({"query": query})
+            # Retrieve relevant documents
+            relevant_docs = self.retriever.get_relevant_documents(query)
             
-            # Extract answer
-            answer = result.get("result", "")
+            if not relevant_docs:
+                return "I don't have enough information to answer this question.", []
             
-            # Clean up answer (remove extra whitespace, newlines)
-            answer = " ".join(answer.split())
+            # Build context from retrieved documents
+            context = "\n\n".join([doc.page_content for doc in relevant_docs[:3]])
+            
+            # Create prompt
+            prompt = f"""You are an AI assistant for port operations. Answer the question based on the context below.
+
+Context:
+{context}
+
+Question: {query}
+
+Answer (be specific and concise):"""
+            
+            # Query HuggingFace API
+            print("🤖 Generating answer...")
+            answer = self._query_huggingface(prompt)
             
             # Extract sources
-            source_docs = result.get("source_documents", [])
             sources = []
-            
-            for doc in source_docs[:3]:  # Limit to top 3 sources
+            for doc in relevant_docs[:3]:
                 source = doc.metadata.get('source', 'Unknown')
                 page = doc.metadata.get('page', '')
                 
@@ -290,17 +275,10 @@ Answer (be specific and cite information from the context):"""
             raise Exception(error_msg)
     
     def get_stats(self) -> Dict[str, Any]:
-        """
-        Get statistics about the vector store.
-        
-        Returns:
-            Dictionary with stats
-        """
+        """Get statistics about the vector store."""
         try:
-            # Try to get collection stats
             collection = self.vectorstore._collection
             
-            # Get document count
             doc_count = 0
             try:
                 doc_count = collection.count()
@@ -311,7 +289,6 @@ Answer (be specific and cite information from the context):"""
                 except:
                     pass
             
-            # Get last modification time
             last_modified = "N/A"
             if os.path.exists(self.persist_directory):
                 try:
@@ -342,21 +319,15 @@ Answer (be specific and cite information from the context):"""
 if __name__ == "__main__":
     print("🧪 Testing RAG Engine...")
     
-    # Check for HF token
     hf_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN") or os.environ.get("HUGGINGFACE_API_TOKEN")
     if not hf_token:
-        print("❌ HuggingFace token not found in environment")
-        print("Set one of these:")
-        print("  export HUGGINGFACEHUB_API_TOKEN='your_token'")
-        print("  export HUGGINGFACE_API_TOKEN='your_token'")
-        print("\nGet a free token at: https://huggingface.co/settings/tokens")
+        print("❌ HuggingFace token not found")
+        print("Get a free token at: https://huggingface.co/settings/tokens")
         exit(1)
     
-    # Initialize engine
     try:
         engine = RAGEngine(hf_token=hf_token)
         
-        # Test with default document if it exists
         if Path("Port Operations Reference Manual.txt").exists():
             print("\n📄 Loading test document...")
             engine.index_documents(["Port Operations Reference Manual.txt"])
@@ -366,10 +337,9 @@ if __name__ == "__main__":
             
             print(f"\n💬 Answer: {answer}")
             print(f"\n📚 Sources: {sources}")
-            
             print("\n✅ RAG Engine test complete!")
         else:
-            print("⚠️ Test document not found, but engine initialized successfully")
+            print("⚠️ Test document not found")
             
     except Exception as e:
         print(f"\n❌ Test failed: {str(e)}")
