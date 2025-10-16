@@ -22,7 +22,7 @@ class RAGEngine:
         self,
         persist_directory: str = "chroma_persist",
         embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2",
-        hf_model: str = "google/flan-t5-base",
+        hf_model: str = "HuggingFaceH4/zephyr-7b-beta",
         hf_token: Optional[str] = None,
         use_openai: bool = False,
         openai_api_key: Optional[str] = None,
